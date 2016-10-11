@@ -13,9 +13,6 @@ library(ggplot2)
 library(scales)
 library(reshape2)
 library(dplyr )
-source("E:/twitter/cleantweets.R")
-source("E:/twitter/wordcloudfunc.R")
-source("E:/twitter/multiplot.R")
 # -------------------------------------------------------------------
 ui <-fluidPage(theme = shinytheme("readable"),
   tags$head(
@@ -81,6 +78,79 @@ server <- function(input, output) {
 
   save(authenticate, file="twitter authentication.Rdata")
   load("twitter authentication.Rdata")
+ #cleantweets function 
+  cleantweets=function(tweetname){
+    
+    clean_tweet = gsub("&amp", "", tweetname)
+    clean_tweet = gsub("(RT|via)((?:\\b\\W*@\\w+)+)", "", clean_tweet)
+    clean_tweet = gsub("@\\w+", "", clean_tweet)
+    clean_tweet = gsub("[[:punct:]]", "", clean_tweet)
+    clean_tweet = gsub("[[:digit:]]", "", clean_tweet)
+    clean_tweet = gsub("http\\w+", "", clean_tweet)
+    clean_tweet = gsub("[ \t]{2,}", "", clean_tweet)
+    clean_tweet = gsub("^\\s+|\\s+$", "", clean_tweet)
+    clean_tweet <- str_replace_all(clean_tweet," "," ")
+    clean_tweet= gsub("http[^[:space:]]*", "", clean_tweet)
+    clean_tweet <- str_replace(clean_tweet,"RT @[a-z,A-Z]*: ","")
+    clean_tweet <- str_replace_all(clean_tweet,"#[a-z,A-Z]*","")
+    clean_tweet <- str_replace_all(clean_tweet,"@[a-z,A-Z]*","")
+    clean_tweet
+  }
+
+  #multiplot function
+  multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+    library(grid)
+    
+    # Make a list from the ... arguments and plotlist
+    plots <- c(list(...), plotlist)
+    
+    numPlots = length(plots)
+    
+    # If layout is NULL, then use 'cols' to determine layout
+    if (is.null(layout)) {
+      # Make the panel
+      # ncol: Number of columns of plots
+      # nrow: Number of rows needed, calculated from # of cols
+      layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                       ncol = cols, nrow = ceiling(numPlots/cols))
+    }
+    
+    if (numPlots==1) {
+      print(plots[[1]])
+      
+    } else {
+      # Set up the page
+      grid.newpage()
+      pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+      
+      # Make each plot, in the correct location
+      for (i in 1:numPlots) {
+        # Get the i,j matrix positions of the regions that contain this subplot
+        matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+        
+        print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                        layout.pos.col = matchidx$col))
+      }
+    }
+  }
+  
+  #wordcloud function
+  wordcloudfunc=function(tweethandle,n){
+    nohandles <- str_replace_all(cleantweets(tweethandle), "@\\w+", "")
+    wordCorpus <- Corpus(VectorSource(nohandles))
+    wordCorpus <- tm_map(wordCorpus, removePunctuation)
+    wordCorpus <- tm_map(wordCorpus, content_transformer(tolower))
+    wordCorpus <- tm_map(wordCorpus, removeWords, stopwords("english"))
+    wordCorpus <- tm_map(wordCorpus, removeWords, c("amp", "2yo", "3yo", "4yo"))
+    wordCorpus <- tm_map(wordCorpus, stripWhitespace)
+    wordCorpus <- tm_map(wordCorpus, stemDocument)
+    col=brewer.pal(6,"Dark2")
+    
+    y=wordcloud(wordCorpus, min.freq=0.05*n, scale=c(7,1),rot.per = 0.25,
+                random.color=T, max.word=100, random.order=F,colors=col)
+    return(y)
+  }
+  
   
   observeEvent(input$start,{
     
@@ -94,8 +164,8 @@ server <- function(input, output) {
   NumTweets <- c(length(tweet1_txt), length(tweet2_txt))
   tweets <- c(tweet1_txt, tweet2_txt)
   tweets <- sapply(tweets,function(x) iconv(x, "latin1", "ASCII", sub=""))
-  writeLines(tweet1_txt,"tweet1.txt")
-  writeLines(tweet2_txt,"tweet2.txt")
+  #writeLines(tweet1_txt,"tweet1.txt")
+  #writeLines(tweet2_txt,"tweet2.txt")
   paste(tweets, collapse=" ")
   tweets=cleantweets(tweets)
   
